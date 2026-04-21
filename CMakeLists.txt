@@ -9,7 +9,7 @@ cmake_minimum_required ( VERSION 3.1.0...4.0.0 )
 project ( RTWeekend LANGUAGES CXX )
 
 # Set to C++20
-set ( CMAKE_CXX_STANDARD          20 )
+set ( CMAKE_CXX_STANDARD          23 )
 set ( CMAKE_CXX_STANDARD_REQUIRED ON )
 set ( CMAKE_CXX_EXTENSIONS        OFF )
 
@@ -21,16 +21,16 @@ set ( EXTERNAL
 
 set ( SOURCE_ONE_WEEKEND
   src/main.cpp
-  # src/InOneWeekend/camera.h
-  # src/InOneWeekend/color.h
-  # src/InOneWeekend/hittable.h
-  # src/InOneWeekend/hittable_list.h
-  # src/InOneWeekend/interval.h
-  # src/InOneWeekend/material.h
-  # src/InOneWeekend/ray.h
-  # src/InOneWeekend/rtweekend.h
-  # src/InOneWeekend/sphere.h
-  # src/InOneWeekend/vec3.h
+  # src/camera.h
+  src/color.h
+  # src/hittable.h
+  # src/hittable_list.h
+  # src/interval.h
+  # src/material.h
+  src/ray.h
+  # src/rtweekend.h
+  # src/sphere.h
+  src/vec3.h
 )
 
 set ( SOURCE_NEXT_WEEK
