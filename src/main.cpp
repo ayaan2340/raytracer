@@ -4,8 +4,28 @@
 #include <iostream>
 #include <algorithm>
 
+double hit_sphere(const point3& center, double radius, const ray& r) {
+    vec3 diff {center - r.origin()};
+    auto a {dot(r.direction(), r.direction())};
+    auto b {dot(-2 * r.direction(), diff)};
+    auto c {dot(diff, diff) - radius * radius};
+
+    auto discriminant {b * b - 4 * a * c}; 
+    if (discriminant < 0)
+        return -1.0;
+    else 
+        return (-b - std::sqrt(discriminant)) / (2.0 * a);
+}
+
 color ray_color(const ray& r) {
-    return color(0, 0.5 * (unit_vector(r.direction()).y() + 1.0), 0);
+    double t {hit_sphere(point3(0, 0, -1), 0.5, r)};
+    if (t > 0.0) {
+        vec3 N {unit_vector(r.at(t) - point3(0, 0, -1))};
+        return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+    }
+
+    auto a {0.5 * (unit_vector(r.direction()).y() + 1.0)};
+    return (1.0 - a) * color(1.0, 1.0, 1.0) + a * color(0.1, 0.0, 0.7);
 }
 
 
