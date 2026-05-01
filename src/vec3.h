@@ -105,7 +105,7 @@ constexpr inline vec3 unit_vector(const vec3& v) {
 
 inline vec3 random_unit_vector() {
     while (true) {
-        vec3 p {vec3::random()};
+        vec3 p {vec3::random(-1, 1)};
         auto length_squared {p.length_squared()};
         if (1e-160 < length_squared && length_squared <= 1)
             return p / sqrt(length_squared);
@@ -114,7 +114,7 @@ inline vec3 random_unit_vector() {
 
 inline vec3 random_on_hemisphere(const vec3& normal) {
     vec3 on_unit_sphere {random_unit_vector()};
-    if (dot(on_unit_sphere, normal) < 0)
+    if (dot(on_unit_sphere, normal) > 0)
         return -on_unit_sphere;
     return on_unit_sphere;
 }

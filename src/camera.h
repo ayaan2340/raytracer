@@ -8,7 +8,7 @@ class camera {
         double aspect_ratio = 1.0;  // Ratio of image width over height
         int image_width = 100;  // Rendered image width in pixel count
         int samples_per_pixel = 10;   // Count of random samples for each pixel
-        int max_depth = 50;   // Maximum ray-bounce recursion depth
+        int max_depth = 10;   // Maximum ray-bounce recursion depth
 
         void render(const hittable& world) {
             initialize();
@@ -81,7 +81,7 @@ class camera {
 
             hit_record rec;
             if (world.hit(r, interval(0.001, +infinity), rec)) {
-                vec3 direction {random_on_hemisphere(rec.normal)};
+                vec3 direction {rec.normal + random_unit_vector()};
                 return 0.5 * ray_color(ray(rec.p, direction), world, depth - 1);
             }
 
