@@ -5,10 +5,16 @@
 
 using color = vec3;
 
+double linear_to_gamma(double c) {
+    if (c > 0)
+        return std::sqrt(c);
+    return 0;
+}
+
 void write_color(std::ostream &out, const color& pixel) {
-    auto r = pixel.x();
-    auto g = pixel.y();
-    auto b = pixel.z();
+    auto r = linear_to_gamma(pixel.x());
+    auto g = linear_to_gamma(pixel.y());
+    auto b = linear_to_gamma(pixel.z());
 
     interval intensity = interval(0, 0.999);
     int rbyte = int(256 * intensity.clamp(r));
