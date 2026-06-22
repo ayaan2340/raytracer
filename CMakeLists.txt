@@ -1,118 +1,89 @@
 #---------------------------------------------------------------------------------------------------
-# CMake Build Configuration for the Ray Tracing Weekend Series
-#
-# See README.md for guidance.
+# GPU-Ready Path Tracer
 #---------------------------------------------------------------------------------------------------
 
-cmake_minimum_required ( VERSION 3.1.0...4.0.0 )
+cmake_minimum_required(VERSION 3.16)
 
-project ( RTWeekend LANGUAGES CXX )
+project(RTWeekend LANGUAGES CXX)
 
-# Set to C++20
-set ( CMAKE_CXX_STANDARD          23 )
-set ( CMAKE_CXX_STANDARD_REQUIRED ON )
-set ( CMAKE_CXX_EXTENSIONS        OFF )
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Source
-
-set ( EXTERNAL
-  src/external/stb_image.h
-)
-
-set ( SOURCE_ONE_WEEKEND
-  src/main.cpp
-  src/camera.h
-  src/color.h
-  src/hittable.h
-  src/hittable_list.h
-  src/interval.h
-  # src/material.h
-  src/ray.h
-  src/rtweekend.h
-  src/sphere.h
-  src/vec3.h
-)
-
-set ( SOURCE_NEXT_WEEK
-  src/TheNextWeek/main.cc
-  src/TheNextWeek/aabb.h
-  src/TheNextWeek/bvh.h
-  src/TheNextWeek/camera.h
-  src/TheNextWeek/color.h
-  src/TheNextWeek/constant_medium.h
-  src/TheNextWeek/hittable.h
-  src/TheNextWeek/hittable_list.h
-  src/TheNextWeek/interval.h
-  src/TheNextWeek/material.h
-  src/TheNextWeek/perlin.h
-  src/TheNextWeek/quad.h
-  src/TheNextWeek/ray.h
-  src/TheNextWeek/rtw_stb_image.h
-  src/TheNextWeek/rtweekend.h
-  src/TheNextWeek/sphere.h
-  src/TheNextWeek/texture.h
-  src/TheNextWeek/vec3.h
-)
-
-set ( SOURCE_REST_OF_YOUR_LIFE
-  src/TheRestOfYourLife/main.cc
-  src/TheRestOfYourLife/aabb.h
-  src/TheRestOfYourLife/camera.h
-  src/TheRestOfYourLife/color.h
-  src/TheRestOfYourLife/constant_medium.h
-  src/TheRestOfYourLife/hittable.h
-  src/TheRestOfYourLife/hittable_list.h
-  src/TheRestOfYourLife/interval.h
-  src/TheRestOfYourLife/material.h
-  src/TheRestOfYourLife/onb.h
-  src/TheRestOfYourLife/pdf.h
-  src/TheRestOfYourLife/perlin.h
-  src/TheRestOfYourLife/quad.h
-  src/TheRestOfYourLife/ray.h
-  src/TheRestOfYourLife/rtw_stb_image.h
-  src/TheRestOfYourLife/rtweekend.h
-  src/TheRestOfYourLife/sphere.h
-  src/TheRestOfYourLife/texture.h
-  src/TheRestOfYourLife/vec3.h
-)
+option(BUILD_VIEWER "Build the real-time raylib viewer" ON)
 
 include_directories(src)
 
-# Specific compiler flags below. We're not going to add options for all possible compilers, but if
-# you're new to CMake (like we are), the following may be a helpful example if you're using a
-# different compiler or want to set different compiler options.
-
-message (STATUS "Compiler ID: " ${CMAKE_CXX_COMPILER_ID})
-message (STATUS "Release flags: " ${CMAKE_CXX_FLAGS_RELEASE})
-message (STATUS "Debug flags: " ${CMAKE_CXX_FLAGS_DEBUG})
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    # /wd #### - Disable warning
-    # /we #### - treat warning as error
-    add_compile_options("/W4")      # Enable level-4 warnings
-    add_compile_options("/we 4265") # Class has virtual functions, but its non-trivial destructor is not virtual
-    add_compile_options("/we 5204") # Class has virtual functions, but its trivial destructor is not virtual
-    add_compile_options("/wd 4100") # unreferenced formal parameter
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wnon-virtual-dtor) # Class has virtual functions, but its destructor is not virtual
-    add_compile_options(-Wreorder) # Data member will be initialized after [other] data member
-    add_compile_options(-Wmaybe-uninitialized) # Variable improperly initialized
-    add_compile_options(-Wunused-variable) # Variable is defined but unused
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wnon-virtual-dtor) # Class has virtual functions, but its destructor is not virtual
-    add_compile_options(-Wreorder) # Data member will be initialized after [other] data member
-    add_compile_options(-Wsometimes-uninitialized) # Variable improperly initialized
-    add_compile_options(-Wunused-variable) # Variable is defined but unused
+# AppleClang ships without OpenMP support out of the box. If Homebrew's libomp
+# is installed, hand find_package the right hints so it can build a correct
+# OpenMP::OpenMP_CXX target (flags + include dir + library) for us.
+if(APPLE AND NOT DEFINED OpenMP_CXX_FLAGS)
+    find_program(BREW_EXECUTABLE brew)
+    if(BREW_EXECUTABLE)
+        execute_process(
+            COMMAND ${BREW_EXECUTABLE} --prefix libomp
+            OUTPUT_VARIABLE LIBOMP_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+    endif()
+    foreach(candidate "${LIBOMP_PREFIX}" /opt/homebrew/opt/libomp /usr/local/opt/libomp)
+        if(candidate AND EXISTS "${candidate}/lib/libomp.dylib")
+            set(OpenMP_CXX_FLAGS "-Xclang -fopenmp -I${candidate}/include")
+            set(OpenMP_CXX_LIB_NAMES "omp")
+            set(OpenMP_omp_LIBRARY "${candidate}/lib/libomp.dylib")
+            break()
+        endif()
+    endforeach()
 endif()
 
-# Executables
-add_executable(inOneWeekend        ${SOURCE_ONE_WEEKEND})
-# add_executable(theNextWeek       ${EXTERNAL} ${SOURCE_NEXT_WEEK})
-# add_executable(theRestOfYourLife ${EXTERNAL} ${SOURCE_REST_OF_YOUR_LIFE})
-# add_executable(cos_cubed         src/TheRestOfYourLife/cos_cubed.cc         )
-# add_executable(cos_density       src/TheRestOfYourLife/cos_density.cc       )
-# add_executable(integrate_x_sq    src/TheRestOfYourLife/integrate_x_sq.cc    )
-# add_executable(pi                src/TheRestOfYourLife/pi.cc                )
-# add_executable(estimate_halfway  src/TheRestOfYourLife/estimate_halfway.cc  )
-# add_executable(sphere_importance src/TheRestOfYourLife/sphere_importance.cc )
-# add_executable(sphere_plot       src/TheRestOfYourLife/sphere_plot.cc       )
+find_package(OpenMP)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wnon-virtual-dtor -Wreorder -Wunused-variable)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wnon-virtual-dtor -Wreorder -Wunused-variable)
+endif()
+
+function(link_openmp target_name)
+    if(NOT OpenMP_CXX_FOUND)
+        return()
+    endif()
+    if(TARGET OpenMP::OpenMP_CXX)
+        target_link_libraries(${target_name} PUBLIC OpenMP::OpenMP_CXX)
+    else()
+        target_compile_options(${target_name} PRIVATE ${OpenMP_CXX_FLAGS})
+        target_link_libraries(${target_name} PUBLIC ${OpenMP_CXX_LIBRARIES})
+    endif()
+endfunction()
+
+set(COMMON_SOURCES
+    src/scene.cpp
+)
+
+add_executable(inOneWeekend
+    src/main.cpp
+    src/image_io.cpp
+    ${COMMON_SOURCES}
+)
+link_openmp(inOneWeekend)
+
+if(BUILD_VIEWER)
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    add_executable(viewer
+        src/viewer.cpp
+        ${COMMON_SOURCES}
+    )
+    target_link_libraries(viewer PRIVATE raylib)
+    link_openmp(viewer)
+endif()

@@ -1,75 +1,64 @@
-#include "rtweekend.h"
-
-#include "hittable.h"
-#include "hittable_list.h"
-#include "sphere.h"
 #include "camera.h"
-#include "material.h"
+#include "scene.h"
 
-int main() {
+#include <cstdio>
+#include <string>
+#include <vector>
 
-    hittable_list world;
+int main(int argc, char** argv) {
+    bool benchmark = false;
+    std::string output_path = "images/final_scene.png";
 
-    auto ground_mat = make_shared<lambertian>(color(0.45, 0.42, 0.38));
-    world.add(make_shared<sphere>(point3(0, -1000, 0), 1000, ground_mat));
-
-    // Random spheres placed around the ground
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            double choose_mat = random_double();
-            point3 center(a + 0.9 * random_double(), 0.2, b + 0.9 * random_double());
-
-            if ((center - point3(0, 1, 0)).length()  > 1.3 &&
-                (center - point3(-4, 1, 0)).length() > 1.3 &&
-                (center - point3(4, 1, 0)).length()  > 1.3)
-            {
-                if (choose_mat < 0.60) {
-                    auto albedo = color(random_double(), random_double(), random_double())
-                                * color(random_double(), random_double(), random_double());
-                    world.add(make_shared<sphere>(center, 0.2,
-                        make_shared<lambertian>(albedo)));
-
-                } else if (choose_mat < 0.85) {
-                    auto albedo = color(random_double(0.5, 1), random_double(0.5, 1), random_double(0.5, 1));
-                    auto fuzz   = random_double(0, 0.4);
-                    world.add(make_shared<sphere>(center, 0.2,
-                        make_shared<metal>(albedo, fuzz)));
-
-                } else {
-                    world.add(make_shared<sphere>(center, 0.2,
-                        make_shared<dielectric>(1.5)));
-                }
-            }
-        }
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--benchmark")
+            benchmark = true;
+        else if (arg == "--output" && i + 1 < argc)
+            output_path = argv[++i];
     }
 
-    // Glass sphere placed in the center
-    auto glass = make_shared<dielectric>(1.5);
-    world.add(make_shared<sphere>(point3( 0, 1, 0),  1.0, glass));
-    world.add(make_shared<sphere>(point3( 0, 1, 0), -0.87, make_shared<dielectric>(1.0 / 1.5)));
+    SceneData scene_data = build_final_scene();
+    Scene world = scene_data.view();
 
-    world.add(make_shared<sphere>(point3(-4, 1, 0), 1.0, make_shared<lambertian>(color(0.15, 0.10, 0.55))));
-    world.add(make_shared<sphere>(point3( 4, 1, 0), 1.0, make_shared<metal>(color(0.85, 0.65, 0.15), 0.02)));
-    world.add(make_shared<sphere>(point3(4.55, 2.35, -0.55), 0.35, make_shared<metal>(color(0.72, 0.40, 0.20), 0.25)));
-    world.add(make_shared<sphere>(point3(-4.6, 0.35, 1.1), 0.35, make_shared<dielectric>(1.5)));
-
-    // Camera 
-    camera cam;
-
-    cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 1200;
+    RenderCamera cam;
+    cam.aspect_ratio = 16.0f / 9.0f;
+    cam.image_width = 1200;
     cam.samples_per_pixel = 500;
-    cam.max_depth         = 50;
-
-    cam.vfov     = 20;
+    cam.max_depth = 50;
+    cam.vfov = 20;
     cam.lookfrom = point3(13, 2, 3);
-    cam.lookat   = point3(0, 0, 0);
-    cam.vup      = vec3(0, 1, 0);
+    cam.lookat = point3(0, 0, 0);
+    cam.vup = vec3(0, 1, 0);
+    cam.defocus_angle = 0.6f;
+    cam.focus_dist = 10.0f;
 
-    cam.defocus_angle = 0.6;
-    cam.focus_dist    = 10.0;
+    std::vector<uint8_t> pixels;
 
-    cam.render(world);
+    if (benchmark) {
+        cam.image_width = 400;
+        cam.samples_per_pixel = 50;
+        cam.use_openmp = false;
+        RenderMetrics single_thread = cam.render(world, pixels);
+        single_thread.print("Single-threaded CPU");
 
+        cam.use_openmp = true;
+        RenderMetrics multi_thread = cam.render(world, pixels);
+        multi_thread.print("OpenMP CPU");
+
+        if (single_thread.seconds > 0) {
+            std::printf("\nSpeedup: %.2fx\n", single_thread.seconds / multi_thread.seconds);
+        }
+    } else {
+        cam.use_openmp = true;
+        RenderMetrics metrics = cam.render(world, pixels);
+        metrics.print("Render complete");
+    }
+
+    if (!cam.save_png(pixels, output_path.c_str())) {
+        std::fprintf(stderr, "Failed to write %s\n", output_path.c_str());
+        return 1;
+    }
+
+    std::printf("Wrote %s\n", output_path.c_str());
     return 0;
 }

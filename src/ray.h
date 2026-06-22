@@ -4,26 +4,18 @@
 #include "vec3.h"
 
 class ray {
-    public:
-        ray() {}
+  public:
+    RT_HOSTDEV ray() = default;
 
-        ray(const point3& origin, const vec3& direction)
-            : orig {origin}, dir {direction} {}
+    RT_HOSTDEV ray(const point3& origin, const vec3& direction) : orig(origin), dir(direction) {}
 
-        
-        const point3& origin() const  { return orig; }
-        const vec3& direction() const { return dir; }
+    RT_HOSTDEV const point3& origin() const { return orig; }
+    RT_HOSTDEV const vec3& direction() const { return dir; }
+    RT_HOSTDEV point3 at(Real t) const { return orig + t * dir; }
 
-        point3 at(double t) const {
-            return orig + t * dir;
-        }
-
-
-    private:
-        point3 orig;
-        vec3 dir;
-
+  private:
+    point3 orig;
+    vec3 dir;
 };
-
 
 #endif

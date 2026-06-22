@@ -1,38 +1,31 @@
 #ifndef INTERVAL_H
 #define INTERVAL_H
 
+#include "rtweekend.h"
+
 class interval {
-    public:
-        double min, max;
+  public:
+    Real min, max;
 
-        interval() : min {+infinity}, max {-infinity} {} // Default is empty
-        interval(double min, double max) : min {min}, max {max} {}
+    RT_HOSTDEV interval() : min(+infinity), max(-infinity) {}
+    RT_HOSTDEV interval(Real min, Real max) : min(min), max(max) {}
 
-        double size() const {
-            return max - min;
-        }
+    RT_HOSTDEV Real size() const { return max - min; }
 
-        bool contains(double d) const {
-            return min <= d && d <= max;
-        }
+    RT_HOSTDEV bool contains(Real d) const { return min <= d && d <= max; }
 
-        bool surrounds(double d) const {
-            return min < d && d < max;
-        }
+    RT_HOSTDEV bool surrounds(Real d) const { return min < d && d < max; }
 
-        double clamp(double d) const {
-            if (d < min) 
-                return min;
-            if (d > max)
-                return max;
+    RT_HOSTDEV Real clamp(Real d) const {
+        if (d < min) return min;
+        if (d > max) return max;
+        return d;
+    }
 
-            return d;
-        }
-
-        static const interval empty, universe;
+    static const interval empty, universe;
 };
 
-const interval interval::empty = interval();
-const interval interval::universe = interval(-infinity, +infinity);
+inline const interval interval::empty = interval();
+inline const interval interval::universe = interval(-infinity, +infinity);
 
 #endif

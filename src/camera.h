@@ -1,121 +1,154 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "hittable.h"
-#include "material.h"
+#include "color.h"
+#include "metrics.h"
+#include "scene.h"
 
-class camera {
-    public:
-        double aspect_ratio = 1.0;  // Ratio of image width over height
-        int image_width = 100;  // Rendered image width in pixel count
-        int samples_per_pixel = 10;   // Count of random samples for each pixel
-        int max_depth = 10;   // Maximum ray-bounce recursion depth
-        double vfov = 90.0;  // Vertical field of view angle
-        point3 lookfrom = point3(0, 0, 0); // Camera origin posiiton
-        point3 lookat = point3(0, 0, -1);  // Point camera is looking at
-        vec3 vup = vec3(0, 1, 0); // Camera relative up direction
-        double defocus_angle = 0; // Variation angle of rays through each pixel
-        double focus_dist = 10; // Distance between lookfrom and plane of focus
+#include <algorithm>
+#include <cstdio>
+#include <vector>
 
-        void render(const hittable& world) {
-            initialize();
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
-            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+struct RenderCamera {
+    Real aspect_ratio = 1.0f;
+    int image_width = 100;
+    int samples_per_pixel = 10;
+    int max_depth = 10;
+    Real vfov = 90.0f;
+    point3 lookfrom = point3(0, 0, 0);
+    point3 lookat = point3(0, 0, -1);
+    vec3 vup = vec3(0, 1, 0);
+    Real defocus_angle = 0;
+    Real focus_dist = 10;
+    bool use_openmp = true;
 
-            for (int j = 0; j < image_height; j++) {
-                std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+    int image_height() const { return std::max(1, static_cast<int>(image_width / aspect_ratio)); }
+
+    void prepare() { initialize(image_height()); }
+
+    RenderMetrics render(const Scene& world, std::vector<uint8_t>& pixels) {
+        const int height = image_height();
+        prepare();
+        pixels.resize(static_cast<size_t>(image_width) * height * 3);
+
+        Timer timer;
+        const Real sample_scale = 1.0f / samples_per_pixel;
+
+#ifdef _OPENMP
+        const int thread_count = use_openmp ? omp_get_max_threads() : 1;
+#else
+        const int thread_count = 1;
+#endif
+
+        if (use_openmp) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+            for (int j = 0; j < height; j++) {
                 for (int i = 0; i < image_width; i++) {
-                    color pixel_color = color(0, 0, 0);
+                    color pixel_color(0, 0, 0);
+                    rng pixel_rng(hash_combine(static_cast<uint32_t>(j), static_cast<uint32_t>(i)));
 
-                    for (int sample { 0 }; sample < samples_per_pixel; sample++) {
-                        ray r {get_ray(i, j)};
-                        pixel_color += ray_color(r, world, max_depth);
+                    for (int sample = 0; sample < samples_per_pixel; sample++) {
+                        ray r = get_ray(i, j, pixel_rng);
+                        pixel_color += trace(r, world, pixel_rng, max_depth);
                     }
-                    write_color(std::cout, pixel_samples_scale * pixel_color);
+
+                    const int index = (j * image_width + i) * 3;
+                    write_color(pixels, index, sample_scale * pixel_color);
                 }
             }
-            std::clog << "\rDone.                 \n";
-        }
+        } else {
+            for (int j = 0; j < height; j++) {
+                std::fprintf(stderr, "\rScanlines remaining: %d ", height - j);
+                for (int i = 0; i < image_width; i++) {
+                    color pixel_color(0, 0, 0);
+                    rng pixel_rng(hash_combine(static_cast<uint32_t>(j), static_cast<uint32_t>(i)));
 
-    private:
-        int image_height; // Rendered image height
-        double pixel_samples_scale; // Color scale factor for a sum of pixel samples
-        point3 center; // Camera center
-        point3 pixel00_loc; // Location of pixel 0, 0
-        vec3 pixel_delta_u; // Offset to pixel to the right
-        vec3 pixel_delta_v; // Offset to pixel below
-        vec3 u, v, w;  // Camera frame basis vectors
-        vec3 defocus_disk_u; // Defocus disk horizontal radius
-        vec3 defocus_disk_v; // Defocus disk vertical radius
+                    for (int sample = 0; sample < samples_per_pixel; sample++) {
+                        ray r = get_ray(i, j, pixel_rng);
+                        pixel_color += trace(r, world, pixel_rng, max_depth);
+                    }
 
-        void initialize() {
-            image_height = std::max(1, static_cast<int>(image_width / aspect_ratio));
-
-            auto theta {degrees_to_radians(vfov)};
-            auto h {std::tan(theta / 2)};
-
-
-            auto viewport_height {h * 2 * focus_dist};
-            auto viewport_width {viewport_height * (double(image_width) / image_height)};
-            center = lookfrom;
-            pixel_samples_scale = 1.0 / samples_per_pixel;
-
-            w = unit_vector(lookfrom - lookat);
-            u = unit_vector(cross(vup, w));
-            v = cross(w, u);
-
-            vec3 viewport_u {viewport_width * u};
-            vec3 viewport_v {viewport_height * -v};
-
-            pixel_delta_u = viewport_u / image_width;
-            pixel_delta_v = viewport_v / image_height;
-
-
-            auto viewport_upper_left = center - (focus_dist * w) - viewport_u / 2 - viewport_v / 2;
-            pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
-
-            auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
-            defocus_disk_u = u * defocus_radius;
-            defocus_disk_v = v * defocus_radius;
-        }
-
-        ray get_ray(int i, int j) {
-            auto offset {sample_square()};
-            point3 pixel_sample = pixel00_loc
-                                + ((i + offset.x()) * pixel_delta_u)
-                                + ((j + offset.y()) * pixel_delta_v);
-            auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
-            auto ray_direction = pixel_sample - ray_origin;
-
-            return ray(ray_origin, ray_direction);
-        }
-
-        vec3 sample_square() {
-            return {random_double() - 0.5, random_double() - 0.5, 0};
-        }
-
-        point3 defocus_disk_sample() const {
-            auto p {random_in_unit_disk()};
-            return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
-        }
-
-        color ray_color(const ray& r, const hittable& world, int depth) const {
-            if (depth <= 0)
-                return color(0, 0, 0);
-
-            hit_record rec;
-            if (world.hit(r, interval(0.001, +infinity), rec)) {
-                ray scattered;
-                color attenuation;
-                if (rec.mat->scatter(r, rec, attenuation, scattered))
-                    return attenuation * ray_color(scattered, world, depth-1);
-
-                return color(0, 0, 0);
+                    const int index = (j * image_width + i) * 3;
+                    write_color(pixels, index, sample_scale * pixel_color);
+                }
             }
-
-            auto a {0.5 * (unit_vector(r.direction()).y() + 1.0)};
-            return (1.0 - a) * color(1.0, 1.0, 1.0) + a * color(0.4, 0.35, 1.0);
+            std::fprintf(stderr, "\rDone.                 \n");
         }
+
+        RenderMetrics metrics;
+        metrics.width = image_width;
+        metrics.height = height;
+        metrics.samples_per_pixel = samples_per_pixel;
+        metrics.max_depth = max_depth;
+        metrics.seconds = timer.elapsed_seconds();
+        metrics.threads = thread_count;
+        return metrics;
+    }
+
+    ray get_ray(int i, int j, rng& rand) {
+        vec3 offset = sample_square(rand);
+        point3 pixel_sample = pixel00_loc + (static_cast<Real>(i) + offset.x()) * pixel_delta_u +
+                              (static_cast<Real>(j) + offset.y()) * pixel_delta_v;
+        point3 ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample(rand);
+        vec3 ray_direction = pixel_sample - ray_origin;
+        return ray(ray_origin, ray_direction);
+    }
+
+  private:
+    Real pixel_samples_scale = 1;
+    point3 center;
+    point3 pixel00_loc;
+    vec3 pixel_delta_u;
+    vec3 pixel_delta_v;
+    vec3 u, v, w;
+    vec3 defocus_disk_u;
+    vec3 defocus_disk_v;
+
+    void initialize(int height) {
+        pixel_samples_scale = 1.0f / samples_per_pixel;
+
+        Real theta = degrees_to_radians(vfov);
+        Real h = std::tan(theta / 2);
+        Real viewport_height = h * 2 * focus_dist;
+        Real viewport_width = viewport_height * (static_cast<Real>(image_width) / height);
+        center = lookfrom;
+
+        w = unit_vector(lookfrom - lookat);
+        u = unit_vector(cross(vup, w));
+        v = cross(w, u);
+
+        vec3 viewport_u = viewport_width * u;
+        vec3 viewport_v = viewport_height * -v;
+
+        pixel_delta_u = viewport_u / image_width;
+        pixel_delta_v = viewport_v / height;
+
+        point3 viewport_upper_left =
+            center - (focus_dist * w) - viewport_u / 2 - viewport_v / 2;
+        pixel00_loc = viewport_upper_left + 0.5f * (pixel_delta_u + pixel_delta_v);
+
+        Real defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
+        defocus_disk_u = u * defocus_radius;
+        defocus_disk_v = v * defocus_radius;
+    }
+
+    vec3 sample_square(rng& rand) {
+        return vec3(rand.next_real() - 0.5f, rand.next_real() - 0.5f, 0);
+    }
+
+    point3 defocus_disk_sample(rng& rand) {
+        vec3 p = random_in_unit_disk(rand);
+        return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
+    }
+
+  public:
+    bool save_png(const std::vector<uint8_t>& pixels, const char* path);
 };
 
 #endif
