@@ -6,6 +6,12 @@ A Monte Carlo path tracer inspired by *Ray Tracing in One Weekend*, refactored t
 
 ## Build
 
+Install OpenMP with
+```bash
+brew install libomp
+```
+
+Then build
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -BUILD_VIEWER
 cmake --build build -j
@@ -13,13 +19,13 @@ cmake --build build -j
 
 ## Run
 
-### Offline render (PNG)
+### Offline render
 
 ```bash
 ./build/inOneWeekend
 ```
 
-### Benchmark mode
+### Offline benchmark mode
 
 ```bash
 ./build/inOneWeekend --benchmark
