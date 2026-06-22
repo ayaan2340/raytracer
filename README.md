@@ -42,37 +42,14 @@ Controls:
 - Shift / Space - down / up
 - Right mouse drag - look around
 
+## Results
 
-## Architecture
+Benchmark scene rendered at 400 x 225, 50 samples/pixel, max depth 50, on an Apple M1 MacBook.
 
-```mermaid
-flowchart TD
-  scene["POD scene: Sphere[] + Material[]"] --> trace["trace() shared iterative path tracer"]
-  trace --> cpu["CPU backend: OpenMP pixel loop"]
-  trace --> viewer["Real-time viewer: raylib accumulation"]
-  trace -. "later" .-> cuda["CUDA backend: 1 thread/pixel kernel"]
-  cpu --> png["PNG render + Mrays/s metrics"]
-```
-
-## Results 
-Single-threaded CPU
-  Resolution:     400 x 225
-  Samples/pixel:  50
-  Max depth:      50
-  Threads:        1
-  Render time:    13.20 s
-  Throughput:     0.34 Mrays/s
-OpenMP CPU
-  Resolution:     400 x 225
-  Samples/pixel:  50
-  Max depth:      50
-  Threads:        8
-  Render time:    3.37 s
-  Throughput:     1.34 Mrays/s
-
-Speedup: 3.92x
-Wrote images/final_scene.png
-On M1 Macbook
+| Backend | Threads | Render time | Throughput | Speedup |
+|---------|--------:|------------:|-----------:|--------:|
+| Single-threaded CPU | 1 | 13.20 s | 0.34 Mrays/s | 1.00x |
+| OpenMP CPU | 8 | 3.37 s | 1.34 Mrays/s | 3.92x |
 
 ## Credits
 
