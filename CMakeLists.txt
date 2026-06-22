@@ -1,7 +1,3 @@
-#---------------------------------------------------------------------------------------------------
-# GPU-Ready Path Tracer
-#---------------------------------------------------------------------------------------------------
-
 cmake_minimum_required(VERSION 3.16)
 
 project(RTWeekend LANGUAGES CXX)
@@ -14,9 +10,6 @@ option(BUILD_VIEWER "Build the real-time raylib viewer" ON)
 
 include_directories(src)
 
-# AppleClang ships without OpenMP support out of the box. If Homebrew's libomp
-# is installed, hand find_package the right hints so it can build a correct
-# OpenMP::OpenMP_CXX target (flags + include dir + library) for us.
 if(APPLE AND NOT DEFINED OpenMP_CXX_FLAGS)
     find_program(BREW_EXECUTABLE brew)
     if(BREW_EXECUTABLE)
