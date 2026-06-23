@@ -76,7 +76,11 @@ link_openmp(inOneWeekend)
 
 if(HAVE_CUDA)
     add_library(cuda_rt STATIC src/cuda/render.cu)
-    set_target_properties(cuda_rt PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(cuda_rt PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CXX_STANDARD 17)
     target_include_directories(cuda_rt PUBLIC src)
     target_compile_definitions(cuda_rt PUBLIC USE_CUDA)
     target_compile_options(cuda_rt PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
