@@ -13,7 +13,7 @@ RT_HOSTDEV inline Real linear_to_gamma(Real c) {
     return 0;
 }
 
-inline void color_to_bytes(const color& pixel, uint8_t& r, uint8_t& g, uint8_t& b) {
+RT_HOSTDEV inline void color_to_bytes(const color& pixel, uint8_t& r, uint8_t& g, uint8_t& b) {
     Real r_lin = linear_to_gamma(pixel.x());
     Real g_lin = linear_to_gamma(pixel.y());
     Real b_lin = linear_to_gamma(pixel.z());

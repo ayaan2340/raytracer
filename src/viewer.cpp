@@ -4,6 +4,10 @@
 
 #include "camera.h"
 
+#ifdef USE_CUDA
+#include "cuda/cuda_render.h"
+#endif
+
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -108,6 +112,13 @@ int main() {
     int accumulated_samples = 0;
     bool camera_moved = true;
 
+#ifdef USE_CUDA
+    CudaRenderer cuda(scene_data);
+    bool use_cuda = cuda.available();
+#else
+    bool use_cuda = false;
+#endif
+
     Image image = GenImageColor(render_width, render_height, BLACK);
     ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
     Texture2D texture = LoadTextureFromImage(image);
@@ -118,6 +129,13 @@ int main() {
         bool moved = false;
         fly.update_from_input(dt, moved);
 
+#ifdef USE_CUDA
+        if (cuda.available() && IsKeyPressed(KEY_C)) {
+            use_cuda = !use_cuda;
+            moved = true;
+        }
+#endif
+
         if (moved) {
             camera_moved = true;
             accumulated_samples = 0;
@@ -127,33 +145,41 @@ int main() {
         fly.apply_to(cam);
         cam.prepare();
 
+        if (use_cuda) {
+#ifdef USE_CUDA
+            cuda.render(cam, pixels, samples_per_frame, accumulated_samples, camera_moved,
+                        static_cast<uint32_t>(accumulated_samples));
+            accumulated_samples += samples_per_frame;
+#endif
+        } else {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-        for (int j = 0; j < render_height; ++j) {
-            for (int i = 0; i < render_width; ++i) {
-                rng pixel_rng(hash_combine(static_cast<uint32_t>(j), static_cast<uint32_t>(i)));
-                pixel_rng.state = hash_combine(pixel_rng.state, static_cast<uint32_t>(accumulated_samples));
+            for (int j = 0; j < render_height; ++j) {
+                for (int i = 0; i < render_width; ++i) {
+                    rng pixel_rng(hash_combine(static_cast<uint32_t>(j), static_cast<uint32_t>(i)));
+                    pixel_rng.state = hash_combine(pixel_rng.state, static_cast<uint32_t>(accumulated_samples));
 
-                color sample_color(0, 0, 0);
-                for (int s = 0; s < samples_per_frame; ++s) {
-                    ray r = cam.get_ray(i, j, pixel_rng);
-                    sample_color += trace(r, world, pixel_rng, max_depth);
+                    color sample_color(0, 0, 0);
+                    for (int s = 0; s < samples_per_frame; ++s) {
+                        ray r = cam.get_ray(i, j, pixel_rng);
+                        sample_color += trace(r, world, pixel_rng, max_depth);
+                    }
+
+                    const int idx = j * render_width + i;
+                    accumulation[idx] += sample_color / static_cast<Real>(samples_per_frame);
                 }
-
-                const int idx = j * render_width + i;
-                accumulation[idx] += sample_color / static_cast<Real>(samples_per_frame);
             }
-        }
 
-        accumulated_samples += samples_per_frame;
-        const Real inv_samples = 1.0f / accumulated_samples;
+            accumulated_samples += samples_per_frame;
+            const Real inv_samples = 1.0f / accumulated_samples;
 
-        for (int j = 0; j < render_height; ++j) {
-            for (int i = 0; i < render_width; ++i) {
-                const int idx = j * render_width + i;
-                const int px = idx * 3;
-                write_color(pixels, px, accumulation[idx] * inv_samples);
+            for (int j = 0; j < render_height; ++j) {
+                for (int i = 0; i < render_width; ++i) {
+                    const int idx = j * render_width + i;
+                    const int px = idx * 3;
+                    write_color(pixels, px, accumulation[idx] * inv_samples);
+                }
             }
         }
 
@@ -163,12 +189,13 @@ int main() {
         ClearBackground(BLACK);
         DrawTexture(texture, 0, 0, WHITE);
 
-        DrawText("WASD move | Right mouse look | Shift/Space up/down", 12, 12, 18, LIGHTGRAY);
+        DrawText("WASD move | Right mouse look | Shift/Space up/down | C toggle GPU", 12, 12, 18, LIGHTGRAY);
         DrawText(TextFormat("FPS: %d", GetFPS()), 12, 36, 20, RAYWHITE);
         DrawText(TextFormat("Accumulated samples: %d", accumulated_samples), 12, 62, 20, RAYWHITE);
-        DrawText(TextFormat("Resolution: %dx%d", render_width, render_height), 12, 88, 20, RAYWHITE);
+        DrawText(TextFormat("Backend: %s", use_cuda ? "CUDA GPU" : "CPU"), 12, 88, 20, RAYWHITE);
+        DrawText(TextFormat("Resolution: %dx%d", render_width, render_height), 12, 114, 20, RAYWHITE);
         if (camera_moved && accumulated_samples < 8)
-            DrawText("Move camera to explore. Image refines when you stop.", 12, 114, 18, YELLOW);
+            DrawText("Move camera to explore. Image refines when you stop.", 12, 140, 18, YELLOW);
 
         EndDrawing();
         camera_moved = moved;

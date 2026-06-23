@@ -13,6 +13,28 @@
 #include <omp.h>
 #endif
 
+struct CameraParams {
+    point3 center;
+    point3 pixel00_loc;
+    vec3 pixel_delta_u;
+    vec3 pixel_delta_v;
+    vec3 defocus_disk_u;
+    vec3 defocus_disk_v;
+    Real defocus_angle = 0;
+
+    RT_HOSTDEV ray get_ray(int i, int j, rng& rand) const {
+        vec3 offset(rand.next_real() - 0.5f, rand.next_real() - 0.5f, 0);
+        point3 pixel_sample = pixel00_loc + (static_cast<Real>(i) + offset.x()) * pixel_delta_u +
+                              (static_cast<Real>(j) + offset.y()) * pixel_delta_v;
+        point3 ray_origin = center;
+        if (defocus_angle > 0) {
+            vec3 p = random_in_unit_disk(rand);
+            ray_origin = center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
+        }
+        return ray(ray_origin, pixel_sample - ray_origin);
+    }
+};
+
 struct RenderCamera {
     Real aspect_ratio = 1.0f;
     int image_width = 100;
@@ -91,60 +113,35 @@ struct RenderCamera {
         return metrics;
     }
 
-    ray get_ray(int i, int j, rng& rand) {
-        vec3 offset = sample_square(rand);
-        point3 pixel_sample = pixel00_loc + (static_cast<Real>(i) + offset.x()) * pixel_delta_u +
-                              (static_cast<Real>(j) + offset.y()) * pixel_delta_v;
-        point3 ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample(rand);
-        vec3 ray_direction = pixel_sample - ray_origin;
-        return ray(ray_origin, ray_direction);
-    }
+    ray get_ray(int i, int j, rng& rand) { return params.get_ray(i, j, rand); }
+
+    CameraParams params;
 
   private:
-    Real pixel_samples_scale = 1;
-    point3 center;
-    point3 pixel00_loc;
-    vec3 pixel_delta_u;
-    vec3 pixel_delta_v;
-    vec3 u, v, w;
-    vec3 defocus_disk_u;
-    vec3 defocus_disk_v;
-
     void initialize(int height) {
-        pixel_samples_scale = 1.0f / samples_per_pixel;
-
         Real theta = degrees_to_radians(vfov);
         Real h = std::tan(theta / 2);
         Real viewport_height = h * 2 * focus_dist;
         Real viewport_width = viewport_height * (static_cast<Real>(image_width) / height);
-        center = lookfrom;
 
-        w = unit_vector(lookfrom - lookat);
-        u = unit_vector(cross(vup, w));
-        v = cross(w, u);
+        vec3 w = unit_vector(lookfrom - lookat);
+        vec3 u = unit_vector(cross(vup, w));
+        vec3 v = cross(w, u);
 
         vec3 viewport_u = viewport_width * u;
         vec3 viewport_v = viewport_height * -v;
 
-        pixel_delta_u = viewport_u / image_width;
-        pixel_delta_v = viewport_v / height;
+        params.center = lookfrom;
+        params.pixel_delta_u = viewport_u / image_width;
+        params.pixel_delta_v = viewport_v / height;
 
-        point3 viewport_upper_left =
-            center - (focus_dist * w) - viewport_u / 2 - viewport_v / 2;
-        pixel00_loc = viewport_upper_left + 0.5f * (pixel_delta_u + pixel_delta_v);
+        point3 viewport_upper_left = lookfrom - (focus_dist * w) - viewport_u / 2 - viewport_v / 2;
+        params.pixel00_loc = viewport_upper_left + 0.5f * (params.pixel_delta_u + params.pixel_delta_v);
 
         Real defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
-        defocus_disk_u = u * defocus_radius;
-        defocus_disk_v = v * defocus_radius;
-    }
-
-    vec3 sample_square(rng& rand) {
-        return vec3(rand.next_real() - 0.5f, rand.next_real() - 0.5f, 0);
-    }
-
-    point3 defocus_disk_sample(rng& rand) {
-        vec3 p = random_in_unit_disk(rand);
-        return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
+        params.defocus_disk_u = u * defocus_radius;
+        params.defocus_disk_v = v * defocus_radius;
+        params.defocus_angle = defocus_angle;
     }
 
   public:

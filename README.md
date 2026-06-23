@@ -17,6 +17,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -BUILD_VIEWER
 cmake --build build -j
 ```
 
+If the CUDA toolkit is detected, an extra `cuda_renderer` GPU executable is built and
+the viewer is linked with a GPU backend. Without CUDA the project builds CPU-only.
+
 ## Run
 
 ### Offline render
@@ -31,6 +34,14 @@ cmake --build build -j
 ./build/inOneWeekend --benchmark
 ```
 
+### CUDA render (requires NVIDIA GPU)
+
+```bash
+./build/cuda_renderer            # GPU render
+./build/cuda_renderer --cuda     # explicit GPU path
+./build/cuda_renderer --benchmark  # CPU vs OpenMP vs CUDA comparison
+```
+
 ### Real-time viewer
 
 ```bash
@@ -41,6 +52,7 @@ Controls:
 - WASD - move
 - Shift / Space - down / up
 - Right mouse drag - look around
+- C - toggle CPU / CUDA backend (when built with CUDA)
 
 ## Results
 

@@ -32,10 +32,23 @@ endif()
 
 find_package(OpenMP)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wnon-virtual-dtor -Wreorder -Wunused-variable)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wnon-virtual-dtor -Wreorder -Wunused-variable)
+include(CheckLanguage)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86)
+    endif()
+    set(HAVE_CUDA ON)
+    message(STATUS "CUDA found: building GPU renderer")
+else()
+    message(STATUS "CUDA not found: building CPU-only")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wnon-virtual-dtor>
+                        $<$<COMPILE_LANGUAGE:CXX>:-Wreorder>
+                        $<$<COMPILE_LANGUAGE:CXX>:-Wunused-variable>)
 endif()
 
 function(link_openmp target_name)
@@ -61,6 +74,22 @@ add_executable(inOneWeekend
 )
 link_openmp(inOneWeekend)
 
+if(HAVE_CUDA)
+    add_library(cuda_rt STATIC src/cuda/render.cu)
+    set_target_properties(cuda_rt PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_include_directories(cuda_rt PUBLIC src)
+    target_compile_definitions(cuda_rt PUBLIC USE_CUDA)
+    target_compile_options(cuda_rt PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+
+    add_executable(cuda_renderer
+        src/main.cpp
+        src/image_io.cpp
+        ${COMMON_SOURCES}
+    )
+    target_link_libraries(cuda_renderer PRIVATE cuda_rt)
+    link_openmp(cuda_renderer)
+endif()
+
 if(BUILD_VIEWER)
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -79,4 +108,7 @@ if(BUILD_VIEWER)
     )
     target_link_libraries(viewer PRIVATE raylib)
     link_openmp(viewer)
+    if(HAVE_CUDA)
+        target_link_libraries(viewer PRIVATE cuda_rt)
+    endif()
 endif()
