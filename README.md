@@ -2,7 +2,12 @@
 
 A Monte Carlo path tracer inspired by *Ray Tracing in One Weekend*, refactored to be run multithreaded on CPU with metrics for benchmarking.
 
+### Progression:
+![Render progressions](images/journey.gif)
+
+### Final render
 ![Final scene render](images/final_scene.png)
+
 
 ## Build
 
@@ -62,6 +67,14 @@ Benchmark scene rendered at 400 x 225, 50 samples/pixel, max depth 50, on an App
 |---------|--------:|------------:|-----------:|--------:|
 | Single-threaded CPU | 1 | 13.20 s | 0.34 Mrays/s | 1.00x |
 | OpenMP CPU | 8 | 3.37 s | 1.34 Mrays/s | 3.92x |
+
+Same scene on a Google Colab instance (NVIDIA T4 GPU, 2-core CPU), 400 x 225, 50 samples/pixel, max depth 50.
+
+| Backend | Threads | Render time | Throughput | Speedup |
+|---------|--------:|------------:|-----------:|--------:|
+| Single-threaded CPU | 1 | 27.41 s | 0.16 Mrays/s | 1.00x |
+| OpenMP CPU | 2 | 24.73 s | 0.18 Mrays/s | 1.11x |
+| CUDA GPU | 90000 | 0.33 s | 13.82 Mrays/s | 83.06x |
 
 ## Credits
 
