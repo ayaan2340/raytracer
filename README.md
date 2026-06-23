@@ -1,6 +1,6 @@
 # Monte Carlo Path Tracer
 
-A Monte Carlo path tracer inspired by *Ray Tracing in One Weekend*, refactored to be run multithreaded on CPU and GPU with metrics for benchmarking.
+A Monte Carlo path tracer designed to be run multithreaded on CPU and GPU with metrics for benchmarking.
 
 ### Progression:
 ![Render progressions](images/journey.gif)
