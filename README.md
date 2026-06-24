@@ -2,7 +2,7 @@
 
 A Monte Carlo path tracer designed to be run multithreaded on CPU and GPU with metrics for benchmarking.
 
-### Progression:
+### Progression
 ![Render progressions](images/journey.gif)
 
 ### Final render
